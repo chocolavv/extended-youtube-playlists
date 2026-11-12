@@ -59,7 +59,7 @@ https://github.com/chocolavv/extended-youtube-playlists
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
-| [Hidden playlists](#hidden-playlists) | Shows the playlists YouTube builds for every channel in the Playlists tab of the channel. |  |
+| [Hidden playlists](#hidden-playlists) | Adds an option to show the playlists YouTube builds for every channel in the Playlists tab of the channel. Settings are in Morphe settings > Feed > Channel page. Requires Morphe Patches. |  |
 
 </details>
 
