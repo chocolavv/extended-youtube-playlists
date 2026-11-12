@@ -29,9 +29,11 @@ In the patched app: **Morphe settings → Feed → Channel page → Hidden playl
 
 - **Show hidden playlists**: turn the whole patch on or off. Off, it does nothing.
 - **Add Playlists tab**: give the tab to channels that have none.
-- One switch for each of the 12 lists. A list that is off is never asked for.
+- One switch for each of the 12 lists. A list that is off is never asked for. On by default:
+  **All → Videos** and **Members only → All kinds**.
 
-Apply this patch together with Morphe Patches: the settings and the log come from them.
+Morphe asks to restart the app after a change: pages already open keep the old lists. Apply
+this patch together with Morphe Patches: the settings and the log come from them.
 
 ### How to use these patches
 
