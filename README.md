@@ -23,6 +23,16 @@ but the app never lists them. This patch puts them on top of the channel's
 - The tab appears even on a channel that has no public playlists.
 - The hidden lists stay first under both sort orders.
 
+### ⚙️ Settings
+
+In the patched app: **Morphe settings → Feed → Channel page → Hidden playlists**.
+
+- **Show hidden playlists**: turn the whole patch on or off. Off, it does nothing.
+- **Add Playlists tab**: give the tab to channels that have none.
+- One switch for each of the 12 lists. A list that is off is never asked for.
+
+Apply this patch together with Morphe Patches: the settings and the log come from them.
+
 ### How to use these patches
 
 Click the button below, or add this repo url to Morphe Manager by hand:

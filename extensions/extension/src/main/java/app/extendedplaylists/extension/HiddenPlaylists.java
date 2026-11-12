@@ -1,7 +1,8 @@
 package app.extendedplaylists.extension;
 
 import android.os.Looper;
-import android.util.Log;
+
+import androidx.annotation.Nullable;
 
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
@@ -16,31 +17,33 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import app.morphe.extension.shared.Logger;
+
 /**
  * Puts the playlists YouTube builds for a channel first in its Playlists tab, and gives the tab to
  * a channel whose page has none.
  */
 @SuppressWarnings("unused")
 public final class HiddenPlaylists {
-    private static final String TAG = "HiddenPlaylists";
-    /** 12 lists in parallel take 444–471 ms on a phone; a channel page opened first prefetches them. */
+    /** 12 lists in parallel take 444-471 ms on a phone; a channel page opened first prefetches them. */
     private static final long WAIT_MS = 2000;
     /**
-     * The app has no string for the channel tab; this one says «Плейлисты» on the downloads page,
+     * The app has no string for the channel tab; this one says "Плейлисты" on the downloads page,
      * the only resource in the APK with that word alone.
      */
     private static final String TAB_TITLE = "downloads_page_playlists_menu_item";
+    /** Fetches by channel and the prefixes turned on when they started. */
     private static final Map<String, Future<List<InnerTube.Playlist>>> fetches = new ConcurrentHashMap<>();
     private static final ExecutorService pool = Executors.newCachedThreadPool();
 
     /** Injection point: a browse response, right after the network bytes are parsed. */
-    public static Object onBrowseResponse(Object message) {
+    public static Object onBrowseResponse(@Nullable Object message) {
+        if (message == null || !Settings.HIDDEN_PLAYLISTS.get()) return message;
         try {
-            if (message == null) return null;
             byte[] out = rewrite((byte[]) message.getClass().getMethod("toByteArray").invoke(message));
             return out == null ? message : parse(message, out);
-        } catch (Throwable t) {
-            Log.e(TAG, "rewrite failed", t);
+        } catch (Exception ex) {
+            Logger.printException(() -> "onBrowseResponse failure", ex);
             return message;
         }
     }
@@ -50,12 +53,13 @@ public final class HiddenPlaylists {
      * starts the fetch. A channel page without a Playlists tab gets one; on the Playlists tab the
      * hidden lists come first, cloned from a server card, or built when the server sent none.
      */
-    static byte[] rewrite(byte[] response) {
+    @Nullable static byte[] rewrite(byte[] response) {
         Proto root = Proto.parse(response);
         Map<String, String> page = root == null ? null : params(root);
         String channel = page == null ? null : page.get("browse_id");
-        if (channel == null || !channel.startsWith("UC")) return null;
-        Future<List<InnerTube.Playlist>> fetch = fetch(channel);
+        List<String> order = InnerTube.order();
+        if (channel == null || !channel.startsWith("UC") || order.isEmpty()) return null;
+        Future<List<InnerTube.Playlist>> fetch = fetch(channel, order);
         boolean tabRoute = "channel.playlists".equals(page.get("route"));
         // A switch to a tab answers only its section list (field 10); a page opened on a tab has
         // all tabs (field 9) and only the shown one holds sections.
@@ -65,8 +69,10 @@ public final class HiddenPlaylists {
         Proto section = list == null ? null : itemSection(list);
         boolean playlistsShown = browse == null || shown != null && Tab.PLAYLISTS.equals(Tab.name(shown));
         List<Card> cards = cards(playlistsShown ? section : null);
-        boolean noTab = browse != null && tab(browse, Tab.PLAYLISTS) == null;
-        boolean server = tabRoute && !cards.isEmpty(), own = tabRoute && list != null && cards.isEmpty();
+        boolean noTab = browse != null && tab(browse, Tab.PLAYLISTS) == null && Settings.ADD_TAB.get();
+        // A link to the Playlists tab of a channel without one shows Home: its list stays unless the tab is added.
+        boolean server = tabRoute && !cards.isEmpty();
+        boolean own = tabRoute && list != null && cards.isEmpty() && (playlistsShown || noTab);
         if (!noTab && !server && !own) return null;
         List<InnerTube.Playlist> lists = await(fetch);
         if (lists == null || lists.isEmpty()) return null;
@@ -76,6 +82,7 @@ public final class HiddenPlaylists {
         Proto tab = noTab && title != null ? Tab.add(browse, title) : null;
         if (!own) return tab == null ? null : tab.commit();
         if (tab != null) list = Tab.show(browse, tab);
+        else if (!playlistsShown) return null;
         Proto items = new Proto();
         for (InnerTube.Playlist p : lists) {
             byte[] item = Card.build(p, response);
@@ -86,12 +93,12 @@ public final class HiddenPlaylists {
         list.fields.removeAll(list.all(1));
         list.fields.removeAll(list.all(2));
         list.fields.add(0,new Proto.Field(1, Proto.message(50195462, items.toBytes())));
-        Log.i(TAG, "own playlists tab " + channel + ": +" + items.fields.size());
+        Logger.printDebug(() -> "Own playlists tab " + channel + ": +" + items.fields.size());
         return list.commit();
     }
 
     /** The shown tab of a page response, or null. */
-    private static Proto shownTab(Proto browse) {
+    @Nullable private static Proto shownTab(@Nullable Proto browse) {
         if (browse != null) for (Proto.Field f : browse.all(1)) {
             Proto t = Tab.open(browse, f);
             if (t != null && Tab.shown(t)) return t;
@@ -99,7 +106,7 @@ public final class HiddenPlaylists {
         return null;
     }
 
-    private static Proto tab(Proto browse, String name) {
+    @Nullable private static Proto tab(Proto browse, String name) {
         for (Proto.Field f : browse.all(1)) {
             Proto t = Tab.open(browse, f);
             if (t != null && name.equals(Tab.name(t))) return t;
@@ -109,7 +116,7 @@ public final class HiddenPlaylists {
 
     /**
      * The tracking params of responseContext (field 1) name the page: groups in field 6, key and
-     * value pairs in field 2 of each, e.g. browse_id "UC…" and route "channel.playlists".
+     * value pairs in field 2 of each, e.g. browse_id "UC..." and route "channel.playlists".
      */
     private static Map<String, String> params(Proto root) {
         Map<String, String> out = new HashMap<>();
@@ -129,7 +136,7 @@ public final class HiddenPlaylists {
     }
 
     /** The first item section of a section list, or null. */
-    private static Proto itemSection(Proto list) {
+    @Nullable private static Proto itemSection(Proto list) {
         for (Proto.Field f : list.all(1)) {
             Proto s = list.open(f);
             if (s != null && (s = s.open(50195462)) != null) return s;
@@ -138,7 +145,7 @@ public final class HiddenPlaylists {
     }
 
     /** The server playlist cards of an item section; empty for null. */
-    private static List<Card> cards(Proto section) {
+    private static List<Card> cards(@Nullable Proto section) {
         List<Card> out = new ArrayList<>();
         if (section != null) for (Proto.Field item : section.all(1)) {
             Card c = Card.of(item.bytes);
@@ -171,30 +178,34 @@ public final class HiddenPlaylists {
         for (int i = lists.size() - 1; i >= 0; i--) {
             section.fields.add(at, new Proto.Field(1, template.clone(lists.get(i))));
         }
-        Log.i(TAG, "playlists tab " + channel + ": +" + lists.size());
+        Logger.printDebug(() -> "Playlists tab " + channel + ": +" + lists.size());
         return section.commit();
     }
 
-    /** One fetch per channel; an empty or failed answer is dropped, so the next visit asks again. */
-    private static Future<List<InnerTube.Playlist>> fetch(String channel) {
-        return fetches.computeIfAbsent(channel, c -> pool.submit(() -> {
+    /**
+     * One fetch per channel and set of lists; an empty or failed answer is dropped, so the next
+     * visit asks again.
+     */
+    private static Future<List<InnerTube.Playlist>> fetch(String channel, List<String> order) {
+        String key = channel + order;
+        return fetches.computeIfAbsent(key, k -> pool.submit(() -> {
             List<InnerTube.Playlist> lists = Collections.emptyList();
             try {
-                return lists = InnerTube.hidden(c);
+                return lists = InnerTube.hidden(channel, order);
             } finally {
-                if (lists.isEmpty()) fetches.remove(c);
+                if (lists.isEmpty()) fetches.remove(key);
             }
         }));
     }
 
     /** The main thread never waits: there only a finished fetch counts. */
-    private static List<InnerTube.Playlist> await(Future<List<InnerTube.Playlist>> fetch) {
+    @Nullable private static List<InnerTube.Playlist> await(Future<List<InnerTube.Playlist>> fetch) {
         try {
             if (Looper.myLooper() == Looper.getMainLooper())
                 return fetch.isDone() ? fetch.get() : null;
             return fetch.get(WAIT_MS, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            Log.w(TAG, "playlists not ready: " + e);
+            Logger.printDebug(() -> "Playlists not ready", e);
             return null;
         }
     }

@@ -1,4 +1,4 @@
-package app.extendedplaylists.patches.youtube
+package app.extendedplaylists.patches.youtube.layout.hiddenplaylists
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.InstructionLocation.MatchAfterImmediately

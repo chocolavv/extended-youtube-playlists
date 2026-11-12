@@ -2,6 +2,8 @@ package app.extendedplaylists.extension;
 
 import android.util.Base64;
 
+import androidx.annotation.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -38,11 +40,11 @@ final class Proto {
     private static final Pattern BASE64 = Pattern.compile("[A-Za-z0-9+/_-]{8,}(=|%3D){0,2}");
 
     final List<Field> fields = new ArrayList<>();
-    private Proto parent;
-    private Field slot;
+    @Nullable private Proto parent;
+    @Nullable private Field slot;
 
     /** Returns null when the bytes are not one clean message. */
-    static Proto parse(byte[] b) {
+    @Nullable static Proto parse(@Nullable byte[] b) {
         if (b == null) return null;
         Proto p = new Proto();
         int[] i = {0};
@@ -102,7 +104,7 @@ final class Proto {
     }
 
     /** The first varint field with this number. */
-    Field flag(int number) {
+    @Nullable Field flag(int number) {
         for (Field f : fields) if (f.number == number && f.wire == 0) return f;
         return null;
     }
@@ -114,13 +116,13 @@ final class Proto {
         return out;
     }
 
-    Field first(int number) {
+    @Nullable Field first(int number) {
         for (Field f : fields) if (f.number == number && f.wire == 2) return f;
         return null;
     }
 
     /** Opens a field of this message for editing; null when it is not a message. */
-    Proto open(Field f) {
+    @Nullable Proto open(@Nullable Field f) {
         Proto p = f == null ? null : parse(f.bytes);
         if (p != null) {
             p.parent = this;
@@ -130,14 +132,14 @@ final class Proto {
     }
 
     /** Opens the first field of each number in turn. */
-    Proto open(int... path) {
+    @Nullable Proto open(int... path) {
         Proto p = this;
         for (int n : path) if (p == null || (p = p.open(p.first(n))) == null) return null;
         return p;
     }
 
     /** The string at a path of first fields, or null. */
-    String text(int... path) {
+    @Nullable String text(int... path) {
         Proto p = open(Arrays.copyOf(path, path.length - 1));
         Field f = p == null ? null : p.first(path[path.length - 1]);
         return f == null ? null : new String(f.bytes, StandardCharsets.UTF_8);
@@ -151,7 +153,7 @@ final class Proto {
     }
 
     /** Bytes of a base64 string, URL-safe or standard, padding maybe escaped as %3D; null when it is not. */
-    static byte[] base64(String s) {
+    @Nullable static byte[] base64(String s) {
         String raw = s.replace("%3D", "=");
         int flags = raw.indexOf('+') < 0 && raw.indexOf('/') < 0 ? Base64.URL_SAFE : Base64.DEFAULT;
         try {
@@ -166,7 +168,7 @@ final class Proto {
      * message, and returns the new bytes. A message is seen before its fields; a base64 string is
      * opened only when the text hook leaves it as it is, and encoded back only when it changed.
      */
-    static byte[] walk(byte[] message, Consumer<Proto> onMessage, UnaryOperator<String> onText) {
+    static byte[] walk(byte[] message, @Nullable Consumer<Proto> onMessage, @Nullable UnaryOperator<String> onText) {
         Proto m = parse(message);
         if (onMessage != null) onMessage.accept(m);
         for (Field f : m.fields) {
@@ -178,7 +180,7 @@ final class Proto {
         return m.toBytes();
     }
 
-    private static String walkText(String s, Consumer<Proto> onMessage, UnaryOperator<String> onText) {
+    private static String walkText(String s, @Nullable Consumer<Proto> onMessage, @Nullable UnaryOperator<String> onText) {
         String t = onText == null ? s : onText.apply(s);
         if (!t.equals(s) || !BASE64.matcher(s).matches()) return t;
         byte[] b = base64(s);
@@ -188,7 +190,7 @@ final class Proto {
     }
 
     /** The bytes as text when they are strict UTF-8 without control characters, else null. */
-    private static String text(byte[] b) {
+    @Nullable private static String text(byte[] b) {
         for (byte c : b) if (c >= 0 && c < 0x20) return null;
         try {
             return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(b)).toString();

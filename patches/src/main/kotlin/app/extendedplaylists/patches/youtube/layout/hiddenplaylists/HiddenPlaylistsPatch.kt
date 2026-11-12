@@ -1,31 +1,24 @@
-package app.extendedplaylists.patches.youtube
+package app.extendedplaylists.patches.youtube.layout.hiddenplaylists
 
+import app.extendedplaylists.patches.youtube.misc.settings.settingsPatch
+import app.extendedplaylists.patches.youtube.shared.COMPATIBILITY_YOUTUBE
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.patch.ApkFileType
-import app.morphe.patcher.patch.AppTarget
-import app.morphe.patcher.patch.Compatibility
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.findFreeRegister
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 private const val EXTENSION = "Lapp/extendedplaylists/extension/HiddenPlaylists;"
 
-internal val COMPATIBILITY_YOUTUBE = Compatibility(
-    name = "YouTube",
-    packageName = "com.google.android.youtube",
-    apkFileType = ApkFileType.APK_REQUIRED,
-    appIconColor = 0xFF0033,
-    targets = listOf(AppTarget(version = "21.30.216", minSdk = 29)),
-)
-
 @Suppress("unused")
 val hiddenPlaylistsPatch = patch(
     name = "Hidden playlists",
-    description = "Shows the playlists YouTube builds for every channel in the Playlists tab of the channel.",
+    description = "Adds an option to show the playlists YouTube builds for every channel in the Playlists " +
+            "tab of the channel. Settings are in Morphe settings > Feed > Channel page. Requires Morphe Patches.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_YOUTUBE)
+    dependsOn(settingsPatch)
     extendWith("extensions/extension.mpe")
 
     execute {

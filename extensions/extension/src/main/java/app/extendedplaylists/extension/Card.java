@@ -1,5 +1,7 @@
 package app.extendedplaylists.extension;
 
+import androidx.annotation.Nullable;
+
 import java.nio.charset.StandardCharsets;
 
 /** A playlist card the server sent, cloned for another playlist by swapping its strings. */
@@ -13,11 +15,11 @@ final class Card {
     private final byte[] item;
     private final String id, count, countText, thumbnail;
     /** "Обновлено вчера": only when the tab is sorted by update date. */
-    private final String updated;
+    @Nullable private final String updated;
     final String title, subtitle;
 
     private Card(byte[] item, String id, String title, String subtitle, String count, String countText,
-                 String thumbnail, String updated) {
+                 String thumbnail, @Nullable String updated) {
         this.item = item;
         this.id = id;
         this.title = title;
@@ -29,7 +31,7 @@ final class Card {
     }
 
     /** Null when the item is not a playlist card. */
-    static Card of(byte[] item) {
+    @Nullable static Card of(byte[] item) {
         Proto p = Proto.parse(item);
         Proto card = p == null ? null : p.open(CARD);
         if (card == null) return null;
@@ -52,7 +54,7 @@ final class Card {
      * draws it on the card template it bundles: asset "compact_playlist.eml_<hash>" has the key
      * "compact_playlist.eml|<hash>". Without a menu the card has no three dots.
      */
-    static byte[] build(InnerTube.Playlist p, byte[] response) {
+    @Nullable static byte[] build(InnerTube.Playlist p, byte[] response) {
         String asset = App.asset(EML, TEMPLATE);
         String label = App.string("playlist_label");
         String theme = key(response, "theme|"), capabilities = key(response, "capabilities|");
@@ -81,7 +83,7 @@ final class Card {
      * A resource key the response names, "theme|<hex>": every EML item of a response carries the
      * same. The key is a whole string field, so its length is the byte before it.
      */
-    private static String key(byte[] response, String prefix) {
+    @Nullable private static String key(byte[] response, String prefix) {
         int at = Proto.indexOf(response, prefix.getBytes(StandardCharsets.UTF_8));
         int length = at > 0 ? response[at - 1] : -1;
         if (length <= prefix.length() || at + length > response.length) return null;

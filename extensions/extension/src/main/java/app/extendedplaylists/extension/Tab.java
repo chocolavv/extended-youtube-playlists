@@ -1,5 +1,7 @@
 package app.extendedplaylists.extension;
 
+import androidx.annotation.Nullable;
+
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -16,12 +18,12 @@ final class Tab {
     private static final int SECTION_LIST = 49399797;
 
     /** The tab renderer in a tab of the browse renderer (field 1), or null. */
-    static Proto open(Proto browse, Proto.Field tab) {
+    @Nullable static Proto open(Proto browse, Proto.Field tab) {
         Proto t = browse.open(tab);
         return t == null ? null : t.open(RENDERER);
     }
 
-    static String name(Proto tab) {
+    @Nullable static String name(Proto tab) {
         Proto params = params(tab);
         return params == null ? null : params.text(NAME);
     }
@@ -31,7 +33,7 @@ final class Tab {
     }
 
     /** The section list of a tab: every tab has one, only the shown tab's holds sections. */
-    static Proto list(Proto tab) {
+    @Nullable static Proto list(Proto tab) {
         return tab.open(CONTENT, SECTION_LIST);
     }
 
@@ -39,7 +41,7 @@ final class Tab {
      * Adds a Playlists tab cloned from a tab that is not shown, and returns it; null when there is
      * no tab to clone. The clone keeps its empty section list.
      */
-    static Proto add(Proto browse, String title) {
+    @Nullable static Proto add(Proto browse, String title) {
         Proto.Field template = null;
         int at = -1, end = 0;
         for (Proto.Field f : browse.all(1)) {
@@ -71,7 +73,7 @@ final class Tab {
      * Makes the tab the shown one: the shown tab hands over its flag and its sections, and keeps an
      * empty section list like every tab that is not shown. Returns the tab's empty section list.
      */
-    static Proto show(Proto browse, Proto tab) {
+    @Nullable static Proto show(Proto browse, Proto tab) {
         for (Proto.Field f : browse.all(1)) {
             Proto t = open(browse, f);
             if (t == null || !shown(t)) continue;
@@ -86,7 +88,7 @@ final class Tab {
         return list(tab);
     }
 
-    private static Proto params(Proto tab) {
+    @Nullable private static Proto params(Proto tab) {
         String raw = tab.text(ENDPOINT, BROWSE, PARAMS);
         return raw == null ? null : Proto.parse(Proto.base64(raw));
     }

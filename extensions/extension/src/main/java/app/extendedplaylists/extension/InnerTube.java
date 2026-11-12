@@ -1,5 +1,7 @@
 package app.extendedplaylists.extension;
 
+import androidx.annotation.Nullable;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -21,13 +23,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import app.morphe.extension.shared.Logger;
+
 /** Asks YouTube for the playlists it builds for every channel, named in the user's language. */
 final class InnerTube {
     /**
      * Prefix + channel id without "UC" (PlayAllButton.PlaylistIDPrefix in morphe-patches). Each row is
      * the list of all kinds of uploads, then its lists of one kind: videos, shorts, live streams.
      */
-    private static final String[][] FAMILIES = {
+    static final String[][] FAMILIES = {
             {"UU", "UULF", "UUSH", "UULV"}, {"PU", "UULP", "UUPS", "UUPV"}, {"UUMO", "UUMF", "UUMS", "UUMV"}};
     /** The popular row stops at 200 videos: there the same size does not prove the same videos. */
     private static final String[] POPULAR = FAMILIES[1];
@@ -43,11 +47,12 @@ final class InnerTube {
     private static final int TIMEOUT_MS = 4000;
 
     static final class Playlist {
-        final String id, title, count, countText, thumbnail, updated, owner;
+        final String id, title, count, countText, thumbnail;
+        @Nullable final String updated, owner;
         final int width, height;
 
         Playlist(String id, String title, String count, String countText, String thumbnail, int width, int height,
-                 String updated, String owner) {
+                 @Nullable String updated, @Nullable String owner) {
             this.id = id;
             this.title = title;
             this.count = count;
@@ -60,15 +65,21 @@ final class InnerTube {
         }
     }
 
-    /** The non-empty hidden playlists of a channel, each kind with its popular pair, members last. Blocks. */
-    static List<Playlist> hidden(String channelId) throws InterruptedException {
-        List<String> order = new ArrayList<>();
+    /** Prefixes of the lists turned on in settings, in shown order: each kind with its popular pair, members last. */
+    static List<String> order() {
+        List<String> all = new ArrayList<>();
         for (int kind = 0; kind < FAMILIES[0].length; kind++) {
-            order.add(FAMILIES[0][kind]);
-            order.add(POPULAR[kind]);
+            all.add(FAMILIES[0][kind]);
+            all.add(POPULAR[kind]);
         }
-        order.addAll(Arrays.asList(FAMILIES[2]));
+        all.addAll(Arrays.asList(FAMILIES[2]));
+        List<String> out = new ArrayList<>();
+        for (String prefix : all) if (Settings.shows(prefix)) out.add(prefix);
+        return out;
+    }
 
+    /** The non-empty hidden playlists of a channel among the given prefixes (not empty), in their order. Blocks. */
+    static List<Playlist> hidden(String channelId, List<String> order) throws InterruptedException {
         List<Callable<Playlist>> calls = new ArrayList<>();
         for (String prefix : order) calls.add(() -> fetch(prefix + channelId.substring(2)));
         ExecutorService pool = Executors.newFixedThreadPool(calls.size());
@@ -76,11 +87,13 @@ final class InnerTube {
         try {
             List<Future<Playlist>> answers = pool.invokeAll(calls, TIMEOUT_MS * 2L, TimeUnit.MILLISECONDS);
             for (int i = 0; i < answers.size(); i++) {
+                String prefix = order.get(i);
                 try {
                     Playlist p = answers.get(i).get();
-                    if (p != null) found.put(order.get(i), p);
-                } catch (Exception ignored) {
+                    if (p != null) found.put(prefix, p);
+                } catch (Exception e) {
                     // A list that failed or timed out is not shown.
+                    Logger.printInfo(() -> "No list " + prefix + channelId.substring(2), e);
                 }
             }
         } finally {
@@ -103,7 +116,7 @@ final class InnerTube {
     }
 
     /** Null when the list is empty or does not exist: then the answer has only an alert. */
-    private static Playlist fetch(String id) throws Exception {
+    @Nullable private static Playlist fetch(String id) throws Exception {
         Locale locale = Locale.getDefault();
         JSONObject client = new JSONObject()
                 .put("clientName", "WEB")
