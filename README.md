@@ -35,7 +35,24 @@ https://github.com/chocolavv/extended-youtube-playlists
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-The list is filled in by the first release.
+> **[v1.0.0](https://github.com/chocolavv/extended-youtube-playlists/releases/tag/v1.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patches total
+<details open>
+<summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Package name:** `com.google.android.youtube`
+
+**🎯 Supported versions:**
+
+| 21.30.216 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Hidden playlists](#hidden-playlists) | Shows the playlists YouTube builds for every channel in the Playlists tab of the channel. |  |
+
+</details>
+
 <!-- PATCHES_END -->
 
 ## 🛠️ Building locally
