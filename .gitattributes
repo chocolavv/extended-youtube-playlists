@@ -1,9 +1,10 @@
-#
-# https://help.github.com/articles/dealing-with-line-endings/
-#
-# Linux start script should use lf
-/gradlew        text eol=lf
+# Text files use LF in the repo and in every working copy, whatever core.autocrlf says:
+# the build runs on Linux, and a CRLF script or .env breaks there.
+* text=auto eol=lf
 
-# These are Windows script files and should use crlf
-*.bat           text eol=crlf
+# Windows scripts need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
 
+*.jar binary
+*.png binary
